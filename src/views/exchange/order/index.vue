@@ -69,7 +69,7 @@
       <el-table-column label="操作" align="center" width="250" fixed="right">
         <template #default="{ row }">
           <el-button v-if="canCancel(row.status)" link type="danger" icon="CircleClose" @click="handleCancel(row)"
-            v-hasPermi="['exchange:order:cancel']">取消</el-button>
+            v-hasPermi="['exchange:order:cancel']">取消订单</el-button>
           <el-button v-if="row.status === 'CONFIRMED'" link type="warning" icon="Check" @click="handleToAudit(row)"
             v-hasPermi="['exchange:order:audit']">提交审核</el-button>
           <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
@@ -98,7 +98,7 @@
 </template>
 
 <script setup name="ExchangeOrderList">
-import { listExchangeOrder, cancelOrder } from '@/api/product/exchange'
+import { listExchangeOrder, cancelOrder, submitToAudit } from '@/api/product/exchange'
 import { useRouter } from 'vue-router'
 
 const { proxy } = getCurrentInstance()
@@ -207,11 +207,18 @@ function submitCancel() {
   }).finally(() => { cancelDialog.loading = false })
 }
 
-// 提交管理员审核（CONFIRMED → AUDITING，后端单独处理或直接在详情页操作）
+// 提交管理员审核（CONFIRMED → AUDITING）
 function handleToAudit(row) {
   proxy.$modal.confirm(`确认将订单「${row.orderNo}」提交管理员审核？`).then(() => {
-    // TODO: 后续补充提交审核接口，目前跳转详情页操作
-    router.push(`/exchange/detail/${row.orderId}`)
+    proxy.$modal.loading('提交中，请稍候...')
+    submitToAudit(row.orderId).then(() => {
+      proxy.$modal.msgSuccess('提交审核成功')
+      getList()
+    }).catch(() => {
+      proxy.$modal.msgError('提交审核失败')
+    }).finally(() => {
+      proxy.$modal.closeLoading()
+    })
   }).catch(() => { })
 }
 

@@ -139,15 +139,26 @@
 
                     <!-- PENDING -->
                     <template v-if="order.status === 'PENDING'">
-                        <p class="action-tip">对方申请与您的物品进行交换，请确认是否接受</p>
-                        <div class="action-btns">
-                            <el-button type="success" class="btn-full" @click="handleAccept" :loading="actionLoading">
-                                接受申请
-                            </el-button>
-                            <el-button type="danger" class="btn-full" @click="rejectDialog.visible = true">
-                                拒绝申请
-                            </el-button>
-                        </div>
+                        <!-- 被交换人（目标方）看到的界面 -->
+                        <template v-if="!isInitiator">
+                            <p class="action-tip">对方申请与您的物品进行交换，请确认是否接受</p>
+                            <div class="action-btns">
+                                <el-button type="success" class="btn-full" @click="handleAccept" :loading="actionLoading">
+                                    接受申请
+                                </el-button>
+                                <el-button type="danger" class="btn-full" @click="rejectDialog.visible = true">
+                                    拒绝申请
+                                </el-button>
+                            </div>
+                        </template>
+                        <!-- 发起人看到的界面 -->
+                        <template v-else>
+                            <el-result icon="info" title="等待对方确认" sub-title="您的交换申请已发送，请等待对方确认">
+                                <template #extra>
+                                    <el-button type="primary" @click="getDetail">刷新状态</el-button>
+                                </template>
+                            </el-result>
+                        </template>
                     </template>
 
                     <!-- EVALUATING -->
@@ -241,6 +252,7 @@
 
 <script setup name="ExchangeOrderDetail">
 import { useRoute } from 'vue-router'
+import useUserStore from '@/store/modules/user'
 import {
     getExchangeOrder, acceptApply, rejectApply,
     submitEvaluate, submitToAudit, auditPass, auditReject, confirmFulfill
@@ -248,6 +260,7 @@ import {
 
 const { proxy } = getCurrentInstance()
 const route = useRoute()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const actionLoading = ref(false)
@@ -301,6 +314,11 @@ const valueDiffWarning = computed(() => {
     const diff = Math.abs(initiatorValue - targetValue)
     const base = Math.max(initiatorValue, targetValue)
     return base > 0 && diff / base > 0.5
+})
+
+// 判断当前用户是否为订单发起人
+const isInitiator = computed(() => {
+    return order.value.initiatorId === userStore.id
 })
 
 function getStatusLabel(status) {

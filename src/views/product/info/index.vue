@@ -1,13 +1,11 @@
 <template>
   <div class="app-container">
-
-    <!-- 搜索区域 -->
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="产品名称" prop="productName">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="auto">
+      <el-form-item label="" prop="productName">
         <el-input v-model="queryParams.productName" placeholder="请输入产品名称" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="所属分类" prop="categoryId">
-        <el-select v-model="queryParams.categoryId" placeholder="请选择分类" clearable>
+      <el-form-item label="" prop="categoryId">
+        <el-select v-model="queryParams.categoryId" placeholder="请选择产品分类" clearable>
           <el-option v-for="item in categoryOptions" :key="item.categoryId" :label="item.categoryName"
             :value="item.categoryId" />
         </el-select>
@@ -18,66 +16,70 @@
       </el-form-item>
     </el-form>
 
-    <!-- 操作按钮 -->
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['product:info:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate"
-          v-hasPermi="['product:info:edit']">修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete"
-          v-hasPermi="['product:info:remove']">删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="warning" plain icon="Download" @click="handleExport"
-          v-hasPermi="['product:info:export']">导出</el-button>
-      </el-col>
-      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
-    </el-row>
+    <div class="mb8" style="display: flex;  align-items: center;">
+      <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['product:info:add']">新增发布</el-button>
 
-    <!-- 数据表格 -->
-    <el-table v-loading="loading" :data="productList" @selection-change="handleSelectionChange" border>
+      <el-button v-if="isAdmin" type="success" plain icon="Edit" :disabled="single" @click="handleUpdate"
+        v-hasPermi="['product:info:edit']">修改</el-button>
+
+      <el-button v-if="isAdmin" type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete"
+        v-hasPermi="['product:info:remove']">删除</el-button>
+
+      <el-button v-if="isAdmin" type="warning" plain icon="Download" @click="handleExport"
+        v-hasPermi="['product:info:export']">导出</el-button>
+
+      <right-toolbar style="margin-left: auto" v-model:showSearch="showSearch" @queryTable="getList" />
+    </div>
+
+    <el-table v-loading="loading" :data="productList" @selection-change="handleSelectionChange" border
+      :row-class-name="tableRowClassName">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="产品名称" align="center" prop="productName" :show-overflow-tooltip="true" />
+      <el-table-column label="产品名称" align="center" prop="productName" :show-overflow-tooltip="true">
+        <template #default="scope">
+          <el-tag v-if="scope.row.createBy === currentUserName" size="small" type="success" effect="dark"
+            style="margin-right: 5px;">我的</el-tag>
+
+          <span>{{ scope.row.productName }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="封面图" align="center">
         <template #default="scope">
-          <image-preview :src="scope.row.coverImage" :width="80" :height="80" />
+          <image-preview :src="scope.row.coverImage" :width="60" :height="60" />
         </template>
       </el-table-column>
-      <el-table-column label="所属分类" align="center" prop="categoryName" />
+      <el-table-column label="所属分类" align="center" prop="categoryName" width="120" />
       <el-table-column label="价格" align="center" prop="price" width="100">
         <template #default="scope">
-          <span>￥{{ scope.row.price }}</span>
+          <span style="color: #f56c6c; font-weight: bold;">￥{{ scope.row.price }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="个数" align="center" prop="quantity" width="80" />
-      <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+      <el-table-column label="发布人" align="center" prop="createBy" width="120" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
+
       <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
-            v-hasPermi="['product:info:edit']">修改</el-button>
-          <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)"
-            v-hasPermi="['product:info:remove']">删除</el-button>
-          <!-- 新增：发起交换按钮 -->
-          <el-button link type="warning" icon="Sort" @click="handleApplyExchange(scope.row)"
-            v-hasPermi="['exchange:order:add']">发起交换</el-button>
+          <template v-if="scope.row.createBy === currentUserName || isAdmin">
+            <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
+              v-hasPermi="['product:info:edit']">修改</el-button>
+            <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)"
+              v-hasPermi="['product:info:remove']">删除</el-button>
+          </template>
+
+          <template v-else>
+            <el-button link type="warning" icon="Sort" @click="handleApplyExchange(scope.row)"
+              v-hasPermi="['exchange:order:add']">发起交换</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 分页 -->
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum"
       v-model:limit="queryParams.pageSize" @pagination="getList" />
 
-    <!-- 新增/修改弹窗 -->
     <el-dialog :title="title" v-model="open" width="560px" append-to-body>
       <el-form ref="productRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="产品名称" prop="productName">
@@ -93,7 +95,7 @@
           <image-upload v-model="form.coverImage" :limit="1" />
         </el-form-item>
         <el-form-item label="价格" prop="price">
-          <el-input-number v-model="form.price" :min="0" :precision="2" :step="0.01" controls-position="right"
+          <el-input-number v-number v-model="form.price" :min="0" :precision="2" :step="0.01" controls-position="right"
             style="width: 100%" />
         </el-form-item>
         <el-form-item label="个数" prop="quantity">
@@ -112,13 +114,7 @@
       </template>
     </el-dialog>
 
-    <!-- 发起交换申请弹窗 -->
-    <ExchangeApplyDialog
-      v-model="applyDialogVisible"
-      :target-item="currentItem"
-      @success="handleApplySuccess"
-    />
-
+    <ExchangeApplyDialog v-model="applyDialogVisible" :target-item="currentItem" @success="handleApplySuccess" />
   </div>
 </template>
 
@@ -126,8 +122,10 @@
 import { listProductInfo, getProductInfo, addProductInfo, updateProductInfo, delProductInfo } from '@/api/product/info'
 import { listCategory } from '@/api/product/category'
 import ExchangeApplyDialog from './ExchangeApplyDialog.vue'
+import useUserStore from '@/store/modules/user'
 
 const { proxy } = getCurrentInstance()
+const userStore = useUserStore()
 
 const productList = ref([])
 const categoryOptions = ref([])
@@ -139,6 +137,18 @@ const single = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const title = ref('')
+
+// 身份计算
+const currentUserName = computed(() => userStore.name)
+const isAdmin = computed(() => userStore.roles.includes('admin'))
+
+// 自己发布的高亮
+function tableRowClassName({ row }) {
+  if (row.createBy === currentUserName.value) {
+    return 'my-row';
+  }
+  return '';
+}
 
 // 发起交换相关
 const applyDialogVisible = ref(false)
@@ -268,3 +278,14 @@ function handleApplySuccess() {
 getCategoryOptions()
 getList()
 </script>
+
+<style scoped>
+:deep(.el-table .my-row) {
+  --el-table-tr-bg-color: #53535309;
+  /* 这里是淡绿色，你可以换成 # (浅橙) */
+}
+
+:deep(.el-table .my-row:hover > td) {
+  background-color: #53535321 !important;
+}
+</style>
