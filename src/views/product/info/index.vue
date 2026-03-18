@@ -60,12 +60,15 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
             v-hasPermi="['product:info:edit']">修改</el-button>
           <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)"
             v-hasPermi="['product:info:remove']">删除</el-button>
+          <!-- 新增：发起交换按钮 -->
+          <el-button link type="warning" icon="Sort" @click="handleApplyExchange(scope.row)"
+            v-hasPermi="['exchange:order:add']">发起交换</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -109,12 +112,20 @@
       </template>
     </el-dialog>
 
+    <!-- 发起交换申请弹窗 -->
+    <ExchangeApplyDialog
+      v-model="applyDialogVisible"
+      :target-item="currentItem"
+      @success="handleApplySuccess"
+    />
+
   </div>
 </template>
 
 <script setup name="ProductInfo">
 import { listProductInfo, getProductInfo, addProductInfo, updateProductInfo, delProductInfo } from '@/api/product/info'
 import { listCategory } from '@/api/product/category'
+import ExchangeApplyDialog from './ExchangeApplyDialog.vue'
 
 const { proxy } = getCurrentInstance()
 
@@ -128,6 +139,10 @@ const single = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const title = ref('')
+
+// 发起交换相关
+const applyDialogVisible = ref(false)
+const currentItem = ref({})
 
 const queryParams = reactive({
   pageNum: 1,
@@ -236,6 +251,18 @@ function handleDelete(row) {
 
 function handleExport() {
   proxy.download('product/info/export', { ...queryParams }, `product_info_${new Date().getTime()}.xlsx`)
+}
+
+/** 发起交换 */
+function handleApplyExchange(row) {
+  currentItem.value = { ...row }
+  applyDialogVisible.value = true
+}
+
+/** 申请成功回调 */
+function handleApplySuccess() {
+  // 后续可跳转订单列表或刷新状态
+  // proxy.$router.push('/exchange/order/list')
 }
 
 getCategoryOptions()
