@@ -41,10 +41,19 @@
                     </template>
                     <div class="items-compare">
                         <div class="item-box">
-                            <div class="item-role target">目标物品（对方）</div>
+                            <div class="item-role target">
+                                <template v-if="isAdmin">
+                                    目标物品
+                                    <el-tag size="small" effect="plain" style="margin-left: 4px">{{
+                                        order.targetOwnerName }}</el-tag>
+                                </template>
+                                <template v-else>
+                                    {{ isInitiator ? '目标物品（对方）' : '您的物品（对方申请）' }}
+                                </template>
+                            </div>
                             <image-preview :src="order.targetCoverImage" :width="80" :height="80" class="item-img" />
                             <div class="item-name">{{ order.targetProductName }}</div>
-                            <div class="item-price" v-if="order.initiatorValue">参考价 ￥{{ order.initiatorValue }}</div>
+                            <div class="item-price" v-if="order.targetValue">参考价 ￥{{ order.targetValue }}</div>
                         </div>
 
                         <div class="exchange-icon">
@@ -55,14 +64,31 @@
 
                         <div class="item-box">
                             <div class="item-role offer">
-                                {{ order.exchangeType === 'item' ? '提供物品（我方）' : '提供积分' }}
+                                <template v-if="isAdmin">
+                                    {{ order.exchangeType === 'item' ? '提供物品' : '提供积分' }}
+                                    <el-tag size="small" effect="plain" type="success" style="margin-left: 4px">{{ order.initiatorName
+                                        }}</el-tag>
+                                </template>
+                                <template v-else>
+                                    {{ isInitiator
+                                        ? (order.exchangeType === 'item' ? '提供物品（我方）' : '提供积分')
+                                        : (order.exchangeType === 'item' ? '对方提供物品' : '对方提供积分')
+                                    }}
+                                </template>
                             </div>
+
                             <template v-if="order.exchangeType === 'item'">
-                                <div class="item-img placeholder-img">
-                                    <el-icon size="32" color="var(--el-text-color-placeholder)">
-                                        <Box />
-                                    </el-icon>
-                                </div>
+                                <template v-if="order.offerCoverImage">
+                                    <image-preview :src="order.offerCoverImage" :width="80" :height="80"
+                                        class="item-img" />
+                                </template>
+                                <template v-else>
+                                    <div class="item-img placeholder-img">
+                                        <el-icon size="32" color="var(--el-text-color-placeholder)">
+                                            <Box />
+                                        </el-icon>
+                                    </div>
+                                </template>
                                 <div class="item-name">{{ order.offerProductName || '-' }}</div>
                             </template>
                             <template v-else>
@@ -81,19 +107,39 @@
                         <span class="card-title">价值评估</span>
                     </template>
                     <el-descriptions :column="3" border>
-                        <el-descriptions-item label="发起方估值">
+                        <el-descriptions-item>
+                            <!-- 动态标签：当前用户是发起方则标注"我的估值" -->
+                            <template #label>
+                                发起方估值
+                                <el-tag v-if="isInitiator" size="small" type="primary" effect="plain"
+                                    style="margin-left: 4px">
+                                    我
+                                </el-tag>
+                            </template>
                             <span v-if="order.initiatorValue" class="price-text">￥{{ order.initiatorValue }}</span>
                             <el-tag v-else type="info" size="small">未填写</el-tag>
                         </el-descriptions-item>
-                        <el-descriptions-item label="目标方估值">
+
+                        <el-descriptions-item>
+                            <template #label>
+                                目标方估值
+                                <el-tag v-if="isTargetOwner" size="small" type="primary" effect="plain"
+                                    style="margin-left: 4px">
+                                    我
+                                </el-tag>
+                            </template>
                             <span v-if="order.targetValue" class="price-text">￥{{ order.targetValue }}</span>
+                            <!-- 目标方自己还没填时提示更明确 -->
+                            <el-tag v-else-if="isTargetOwner" type="warning" size="small">待您填写</el-tag>
                             <el-tag v-else type="warning" size="small">待填写</el-tag>
                         </el-descriptions-item>
+
                         <el-descriptions-item label="最终成交估值">
                             <span v-if="order.finalValue" class="price-text final">￥{{ order.finalValue }}</span>
                             <el-tag v-else type="info" size="small">待确定</el-tag>
                         </el-descriptions-item>
                     </el-descriptions>
+
                     <el-alert v-if="valueDiffWarning" title="双方估值偏差超过50%，建议重新协商" type="warning" show-icon
                         :closable="false" class="mt-12" />
                 </el-card>
@@ -139,11 +185,13 @@
 
                     <!-- PENDING -->
                     <template v-if="order.status === 'PENDING'">
-                        <!-- 被交换人（目标方）看到的界面 -->
-                        <template v-if="!isInitiator">
+
+                        <!-- 目标方：看到接受/拒绝 -->
+                        <template v-if="isTargetOwner">
                             <p class="action-tip">对方申请与您的物品进行交换，请确认是否接受</p>
                             <div class="action-btns">
-                                <el-button type="success" class="btn-full" @click="handleAccept" :loading="actionLoading">
+                                <el-button type="success" class="btn-full" @click="handleAccept"
+                                    :loading="actionLoading">
                                     接受申请
                                 </el-button>
                                 <el-button type="danger" class="btn-full" @click="rejectDialog.visible = true">
@@ -151,58 +199,96 @@
                                 </el-button>
                             </div>
                         </template>
-                        <!-- 发起人看到的界面 -->
-                        <template v-else>
+
+                        <!-- 发起方：等待确认 -->
+                        <template v-else-if="isInitiator">
                             <el-result icon="info" title="等待对方确认" sub-title="您的交换申请已发送，请等待对方确认">
                                 <template #extra>
                                     <el-button type="primary" @click="getDetail">刷新状态</el-button>
                                 </template>
                             </el-result>
                         </template>
+
+                        <!-- 管理员：仅查看 -->
+                        <template v-else>
+                            <el-result icon="info" title="待双方确认" sub-title="该订单正在等待目标方响应" />
+                        </template>
+
                     </template>
 
                     <!-- EVALUATING -->
                     <template v-else-if="order.status === 'EVALUATING'">
-                        <p class="action-tip">请填写您认为的合理交换价值</p>
-                        <el-form :model="evaluateForm" label-width="80px">
-                            <el-form-item label="期望估值">
-                                <el-input-number v-model="evaluateForm.targetValue" :min="0" :precision="2"
-                                    controls-position="right" style="width:100%" />
-                            </el-form-item>
-                        </el-form>
-                        <el-button type="primary" class="btn-full" @click="handleEvaluate" :loading="actionLoading">
-                            提交估值
-                        </el-button>
+
+                        <!-- 目标方填写估值 -->
+                        <template v-if="isTargetOwner && !order.targetValue">
+                            <p class="action-tip">请填写您认为的合理交换价值</p>
+                            <el-form :model="evaluateForm" label-width="80px">
+                                <el-form-item label="期望估值">
+                                    <el-input-number v-model="evaluateForm.targetValue" :min="0" :precision="2"
+                                        controls-position="right" style="width:100%" />
+                                </el-form-item>
+                            </el-form>
+                            <el-button type="primary" class="btn-full" @click="handleEvaluate" :loading="actionLoading">
+                                提交估值
+                            </el-button>
+                        </template>
+
+                        <!-- 目标方已提交，等待系统确认 -->
+                        <template v-else-if="isTargetOwner && order.targetValue">
+                            <el-result icon="success" title="估值已提交" sub-title="等待系统自动确认中" />
+                        </template>
+
+                        <!-- 发起方等待 -->
+                        <template v-else-if="isInitiator">
+                            <el-result icon="info" title="等待对方估值" sub-title="对方正在填写期望价值，请耐心等待">
+                                <template #extra>
+                                    <el-button type="primary" @click="getDetail">刷新状态</el-button>
+                                </template>
+                            </el-result>
+                        </template>
+
+                        <!-- 管理员查看 -->
+                        <template v-else>
+                            <el-result icon="info" title="估值进行中" />
+                        </template>
+
                     </template>
 
                     <!-- CONFIRMED -->
                     <template v-else-if="order.status === 'CONFIRMED'">
-                        <p class="action-tip">双方已确认估值，可提交管理员审核</p>
-                        <el-button type="primary" class="btn-full" @click="handleToAudit" :loading="actionLoading">
-                            提交审核
-                        </el-button>
+                        <template v-if="isInitiator || isTargetOwner">
+                            <p class="action-tip">双方已确认估值，可提交管理员审核</p>
+                            <el-button type="primary" class="btn-full" @click="handleToAudit" :loading="actionLoading">
+                                提交审核
+                            </el-button>
+                        </template>
+                        <!-- 管理员查看 -->
+                        <template v-else>
+                            <el-result icon="info" title="待提交审核" sub-title="等待交易双方提交管理员审核" />
+                        </template>
                     </template>
 
                     <!-- AUDITING - 区分管理员和普通用户 -->
                     <template v-else-if="order.status === 'AUDITING'">
-                        <!-- 管理员审核界面 -->
+                        <!-- 管理员审核 -->
                         <div v-hasPermi="['exchange:order:audit']">
                             <p class="action-tip">请审核本次交换申请</p>
                             <el-input v-model="auditForm.remark" type="textarea" :rows="3" placeholder="审核备注（选填）"
                                 class="mb-8" />
                             <div class="action-btns">
-                                <el-button type="success" class="btn-full" @click="handleAuditPass" :loading="actionLoading">
+                                <el-button type="success" class="btn-full" @click="handleAuditPass"
+                                    :loading="actionLoading">
                                     审核通过
                                 </el-button>
-                                <el-button type="danger" class="btn-full" @click="handleAuditReject" :loading="actionLoading">
+                                <el-button type="danger" class="btn-full" @click="handleAuditReject"
+                                    :loading="actionLoading">
                                     审核驳回
                                 </el-button>
                             </div>
                         </div>
-                        
-                        <!-- 普通用户等待界面 -->
+                        <!-- 普通用户等待 -->
                         <div v-hasNoPermi="['exchange:order:audit']">
-                            <el-result icon="info" title="等待管理员审核" sub-title="订单已提交审核，请耐心等待管理员处理">
+                            <el-result icon="info" title="等待管理员审核" sub-title="订单已提交审核，请耐心等待">
                                 <template #extra>
                                     <el-button type="primary" @click="getDetail">刷新状态</el-button>
                                 </template>
@@ -212,10 +298,15 @@
 
                     <!-- FULFILLING -->
                     <template v-else-if="order.status === 'FULFILLING'">
-                        <p class="action-tip">请在线下完成交换后，点击确认收货</p>
-                        <el-button type="success" class="btn-full" @click="handleFulfill" :loading="actionLoading">
-                            确认收货完成
-                        </el-button>
+                        <template v-if="isInitiator || isTargetOwner">
+                            <p class="action-tip">请在线下完成交换后，点击确认收货</p>
+                            <el-button type="success" class="btn-full" @click="handleFulfill" :loading="actionLoading">
+                                确认收货完成
+                            </el-button>
+                        </template>
+                        <template v-else>
+                            <el-result icon="info" title="线下履约中" sub-title="等待双方确认收货" />
+                        </template>
                     </template>
 
                     <!-- 终态 -->
@@ -316,10 +407,15 @@ const valueDiffWarning = computed(() => {
     return base > 0 && diff / base > 0.5
 })
 
-// 判断当前用户是否为订单发起人
-const isInitiator = computed(() => {
-    return order.value.initiatorId === userStore.id
+// 是否为发起方
+const isInitiator = computed(() => order.value.initiatorId === userStore.id)
+
+// 是否为目标方（物品所有者，且不是管理员）
+const isTargetOwner = computed(() => {
+    return !isInitiator.value && order.value.targetOwnerName === userStore.name
 })
+
+const isAdmin = computed(() => userStore.roles.includes('admin'))
 
 function getStatusLabel(status) {
     return statusOptions.find(s => s.value === status)?.label || status
@@ -480,9 +576,8 @@ getDetail()
             .item-role {
                 font-size: 11px;
                 font-weight: 600;
-                letter-spacing: 0.5px;
-                padding: 2px 10px;
-                border-radius: 20px;
+                padding: 6px 10px;
+                border-radius: 8px;
 
                 &.target {
                     background: var(--el-color-primary-light-9);

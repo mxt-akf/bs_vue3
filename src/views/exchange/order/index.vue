@@ -68,8 +68,16 @@
       </el-table-column>
       <el-table-column label="操作" align="center" width="250" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="canCancel(row.status)" link type="danger" icon="CircleClose" @click="handleCancel(row)"
-            v-hasPermi="['exchange:order:cancel']">取消订单</el-button>
+          <!-- 目标方提示 -->
+          <el-tag v-if="getActionTip(row)" type="warning" effect="plain" size="small"
+            style="margin-right: 8px; cursor: pointer" @click="handleDetail(row)">
+            {{ getActionTip(row) }}
+          </el-tag>
+          <!-- 取消：只有发起人才能在列表页取消 -->
+          <el-button v-if="canCancelByInitiator(row)" link type="danger" icon="CircleClose" @click="handleCancel(row)"
+            v-hasPermi="['exchange:order:cancel']">
+            取消订单
+          </el-button>
           <el-button v-if="row.status === 'CONFIRMED'" link type="warning" icon="Check" @click="handleToAudit(row)"
             v-hasPermi="['exchange:order:audit']">提交审核</el-button>
           <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
@@ -100,7 +108,8 @@
 <script setup name="ExchangeOrderList">
 import { listExchangeOrder, cancelOrder, submitToAudit } from '@/api/product/exchange'
 import { useRouter } from 'vue-router'
-
+import useUserStore from '@/store/modules/user'
+const userStore = useUserStore()
 const { proxy } = getCurrentInstance()
 const router = useRouter()
 
@@ -146,6 +155,24 @@ const statusTypeMap = {
   COMPLETED: 'success',
   CANCELLED: 'danger',
   DISPUTED: 'danger'
+}
+
+// 只有发起人 + 允许取消的状态才显示取消按钮
+function canCancelByInitiator(row) {
+  const cancellableStatuses = ['PENDING', 'EVALUATING']
+  const isInitiator = row.initiatorId === userStore.id
+  return isInitiator && cancellableStatuses.includes(row.status)
+}
+
+// 目标方才能看到的待确认的提示
+function getActionTip(row) {
+    const isInitiator = row.initiatorId === userStore.id
+    const isAdmin = userStore.roles.includes('admin')
+    
+    if (!isInitiator && !isAdmin && row.status === 'PENDING') {
+        return '待您确认'
+    }
+    return null
 }
 
 function getStatusLabel(status) {
