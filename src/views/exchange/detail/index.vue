@@ -66,7 +66,8 @@
                             <div class="item-role offer">
                                 <template v-if="isAdmin">
                                     {{ order.exchangeType === 'item' ? '提供物品' : '提供积分' }}
-                                    <el-tag size="small" effect="plain" type="success" style="margin-left: 4px">{{ order.initiatorName
+                                    <el-tag size="small" effect="plain" type="success" style="margin-left: 4px">{{
+                                        order.initiatorName
                                         }}</el-tag>
                                 </template>
                                 <template v-else>
@@ -93,6 +94,9 @@
                             </template>
                             <template v-else>
                                 <div class="points-display">
+                                    <el-icon size="40" color="#f59e0b">
+                                        <Coin />
+                                    </el-icon>
                                     <span class="points-num">{{ order.offerPoints }}</span>
                                     <span class="points-unit">积分</span>
                                 </div>
@@ -268,10 +272,10 @@
                         </template>
                     </template>
 
-                    <!-- AUDITING - 区分管理员和普通用户 -->
+                    <!-- AUDITING -->
                     <template v-else-if="order.status === 'AUDITING'">
                         <!-- 管理员审核 -->
-                        <div v-hasPermi="['exchange:order:audit']">
+                        <template v-if="isAdmin">
                             <p class="action-tip">请审核本次交换申请</p>
                             <el-input v-model="auditForm.remark" type="textarea" :rows="3" placeholder="审核备注（选填）"
                                 class="mb-8" />
@@ -285,15 +289,16 @@
                                     审核驳回
                                 </el-button>
                             </div>
-                        </div>
+                        </template>
+
                         <!-- 普通用户等待 -->
-                        <div v-hasNoPermi="['exchange:order:audit']">
+                        <template v-else>
                             <el-result icon="info" title="等待管理员审核" sub-title="订单已提交审核，请耐心等待">
                                 <template #extra>
                                     <el-button type="primary" @click="getDetail">刷新状态</el-button>
                                 </template>
                             </el-result>
-                        </div>
+                        </template>
                     </template>
 
                     <!-- FULFILLING -->
@@ -688,6 +693,26 @@ getDetail()
 
     .mt-12 {
         margin-top: 12px;
+    }
+}
+
+.points-display {
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+
+    .points-num {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--el-color-warning);
+        line-height: 1;
+    }
+
+    .points-unit {
+        font-size: 14px;
+        color: var(--el-text-color-secondary);
     }
 }
 </style>

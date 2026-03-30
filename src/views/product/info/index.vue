@@ -53,6 +53,13 @@
           <span style="color: #f56c6c; font-weight: bold;">￥{{ scope.row.price }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="状态" align="center" width="90">
+        <template #default="{ row }">
+          <el-tag :type="statusTagType[row.status]" size="small">
+            {{ statusLabel[row.status] }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="发布人" align="center" prop="createBy" width="120" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
         <template #default="scope">
@@ -70,8 +77,10 @@
           </template>
 
           <template v-else>
-            <el-button link type="warning" icon="Sort" @click="handleApplyExchange(scope.row)"
-              v-hasPermi="['exchange:order:add']">发起交换</el-button>
+            <el-button link type="warning" icon="Sort" @click="handleApplyExchange(scope.row)" :disabled="scope.row.status !== 0"
+              v-hasPermi="['exchange:order:add']">
+              {{ scope.row.status === 0 ? '发起交换' : scope.row.status === 1 ? '锁定中' : '已下架' }}
+            </el-button>
           </template>
         </template>
       </el-table-column>
@@ -102,6 +111,7 @@
           <el-input-number v-model="form.quantity" :min="0" :precision="0" controls-position="right"
             style="width: 100%" />
         </el-form-item>
+
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" :rows="3" placeholder="请输入备注" />
         </el-form-item>
@@ -166,9 +176,13 @@ const form = ref({})
 const rules = {
   productName: [{ required: true, message: '产品名称不能为空', trigger: 'blur' }],
   categoryId: [{ required: true, message: '请选择所属分类', trigger: 'change' }],
+  coverImage: [{ required: true, message: '请上传封面图片', trigger: 'change' }],  // 加这行
   price: [{ required: true, message: '价格不能为空', trigger: 'blur' }],
   quantity: [{ required: true, message: '个数不能为空', trigger: 'blur' }]
 }
+
+const statusLabel = { 0: '上架中', 1: '锁定中', 2: '已下架' }
+const statusTagType = { 0: 'success', 1: 'warning', 2: 'info' }
 
 function getCategoryOptions() {
   listCategory({ pageNum: 1, pageSize: 1000 }).then(response => {

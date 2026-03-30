@@ -35,8 +35,16 @@
     <!-- 数据表格 -->
     <el-table v-loading="loading" :data="orderList" border>
       <el-table-column label="订单编号" align="center" prop="orderNo" width="200" />
-      <el-table-column label="目标物品" align="center" prop="targetProductName" :show-overflow-tooltip="true" />
+      <el-table-column label="目标物品" align="center">
+        <template #default="{ row }">
+          <div class="product-cell">
+            <image-preview :src="row.targetCoverImage" :width="50" :height="50" class="product-img" />
+            <span class="product-name">{{ row.targetProductName }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="发起人" align="center" prop="initiatorName" width="100" />
+      <el-table-column label="被接受人" align="center" prop="targetOwnerName" width="100" />
       <el-table-column label="交换方式" align="center" width="100">
         <template #default="{ row }">
           <el-tag :type="row.exchangeType === 'item' ? 'primary' : 'warning'" size="small">
@@ -44,10 +52,30 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="提供物品/积分" align="center" :show-overflow-tooltip="true">
+      <el-table-column label="提供物品/积分" align="center">
         <template #default="{ row }">
-          <span v-if="row.exchangeType === 'item'">{{ row.offerProductName || '-' }}</span>
-          <span v-else class="points-text">{{ row.offerPoints }} 积分</span>
+          <div class="product-cell">
+            <!-- 以物换物：显示商品图片 -->
+            <template v-if="row.exchangeType === 'item'">
+              <image-preview v-if="row.offerCoverImage" :src="row.offerCoverImage" :width="50" :height="50"
+                class="product-img" />
+              <div v-else class="no-img">
+                <el-icon size="20">
+                  <Box />
+                </el-icon>
+              </div>
+              <span class="product-name">{{ row.offerProductName || '-' }}</span>
+            </template>
+            <!-- 积分置换：显示积分 icon -->
+            <template v-else>
+              <div class="points-icon">
+                <el-icon size="24" color="#f59e0b">
+                  <Coin />
+                </el-icon>
+              </div>
+              <span class="points-text">{{ row.offerPoints }} 积分</span>
+            </template>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="发起方估值" align="center" width="110">
@@ -109,6 +137,7 @@
 import { listExchangeOrder, cancelOrder, submitToAudit } from '@/api/product/exchange'
 import { useRouter } from 'vue-router'
 import useUserStore from '@/store/modules/user'
+import { Box, Coin } from '@element-plus/icons-vue'
 const userStore = useUserStore()
 const { proxy } = getCurrentInstance()
 const router = useRouter()
@@ -166,13 +195,13 @@ function canCancelByInitiator(row) {
 
 // 目标方才能看到的待确认的提示
 function getActionTip(row) {
-    const isInitiator = row.initiatorId === userStore.id
-    const isAdmin = userStore.roles.includes('admin')
-    
-    if (!isInitiator && !isAdmin && row.status === 'PENDING') {
-        return '待您确认'
-    }
-    return null
+  const isInitiator = row.initiatorId === userStore.id
+  const isAdmin = userStore.roles.includes('admin')
+
+  if (!isInitiator && !isAdmin && row.status === 'PENDING') {
+    return '待您确认'
+  }
+  return null
 }
 
 function getStatusLabel(status) {
@@ -261,5 +290,53 @@ getList()
 .text-gray {
   color: var(--el-text-color-placeholder);
   font-size: 12px;
+}
+
+.product-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  .product-img {
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .product-name {
+    font-size: 12px;
+    color: var(--el-text-color-regular);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .no-img {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--el-fill-color);
+    border-radius: 6px;
+    border: 1px dashed var(--el-border-color);
+  }
+
+  .points-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fef3c7;
+    border-radius: 6px;
+  }
+
+  .points-text {
+    font-size: 12px;
+    color: #f59e0b;
+    font-weight: 500;
+  }
 }
 </style>
