@@ -11,11 +11,18 @@
     <div class="target-item-card">
       <div class="target-label">申请交换物品</div>
       <div class="target-info">
-        <image-preview :src="targetItem.coverImage" :width="64" :height="64" class="cover" />
+        <image-preview
+          :src="targetItem.coverImage"
+          :width="64"
+          :height="64"
+          class="cover"
+        />
         <div class="meta">
           <div class="name">{{ targetItem.productName }}</div>
           <div class="sub">
-            <el-tag size="small" type="info">{{ targetItem.categoryName }}</el-tag>
+            <el-tag size="small" type="info">{{
+              targetItem.categoryName
+            }}</el-tag>
             <span class="price">￥{{ targetItem.price }}</span>
           </div>
         </div>
@@ -38,7 +45,11 @@
       </el-form-item>
 
       <!-- 以物换物：选择提供的物品 -->
-      <el-form-item v-if="form.exchangeType === 'item'" label="提供物品" prop="offerProductId">
+      <el-form-item
+        v-if="form.exchangeType === 'item'"
+        label="提供物品"
+        prop="offerProductId"
+      >
         <el-select
           v-model="form.offerProductId"
           placeholder="请选择您要提供的物品"
@@ -63,16 +74,25 @@
       </el-form-item>
 
       <!-- 积分置换：输入积分 -->
-      <el-form-item v-if="form.exchangeType === 'points'" label="使用积分" prop="offerPoints">
+      <el-form-item
+        v-if="form.exchangeType === 'points'"
+        label="使用积分"
+        prop="offerPoints"
+      >
         <el-input-number
           v-model="form.offerPoints"
           :min="1"
-          :max="currentPoints"
+          :max="currentPoints > 0 ? currentPoints : 1"
           controls-position="right"
           style="width: 100%"
           placeholder="请输入积分数量"
         />
-        <div class="points-tip">当前可用积分：<b>{{ currentPoints }}</b> 分</div>
+        <div class="points-tip">
+          当前可用积分：<b>{{ currentPoints }}</b> 分
+          <span v-if="currentPoints === 0" style="color: var(--el-color-danger)"
+            >（积分不足，无法置换）</span
+          >
+        </div>
       </el-form-item>
 
       <!-- 期望价值 -->
@@ -103,122 +123,150 @@
 
     <template #footer>
       <el-button @click="handleClose">取 消</el-button>
-      <el-button type="primary" :loading="submitLoading" @click="handleSubmit">提交申请</el-button>
+      <el-button type="primary" :loading="submitLoading" @click="handleSubmit"
+        >提交申请</el-button
+      >
     </template>
   </el-dialog>
 </template>
 
 <script setup name="ExchangeApplyDialog">
-import { Box, Coin, WarningFilled } from '@element-plus/icons-vue'
-import { listProductInfo } from '@/api/product/info'
-import { applyExchange } from '@/api/product/exchange'
-import useUserStore from '@/store/modules/user'
+import { Box, Coin, WarningFilled } from "@element-plus/icons-vue";
+import { listProductInfo } from "@/api/product/info";
+import { applyExchange } from "@/api/product/exchange";
+import useUserStore from "@/store/modules/user";
 
-const userStore = useUserStore()
-const { proxy } = getCurrentInstance()
+const userStore = useUserStore();
+const { proxy } = getCurrentInstance();
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   // 目标物品信息
   targetItem: {
     type: Object,
-    default: () => ({})
-  }
-})
+    default: () => ({}),
+  },
+});
 
-const emit = defineEmits(['update:modelValue', 'success'])
+const emit = defineEmits(["update:modelValue", "success"]);
 
 const visible = computed({
   get: () => props.modelValue,
-  set: (val) => emit('update:modelValue', val)
-})
+  set: (val) => emit("update:modelValue", val),
+});
 
-const formRef = ref(null)
-const submitLoading = ref(false)
-const offerLoading = ref(false)
-const myProducts = ref([])
-const currentPoints = ref(520) // TODO: 从用户信息中获取
-
+const formRef = ref(null);
+const submitLoading = ref(false);
+const offerLoading = ref(false);
+const myProducts = ref([]);
+const currentPoints = ref(userStore.points ?? 0);
+console.log(currentPoints.value);
 const form = reactive({
-  exchangeType: 'item',
+  exchangeType: "item",
   offerProductId: undefined,
   offerPoints: undefined,
   initiatorValue: undefined,
-  remark: ''
-})
+  remark: "",
+});
 
 const rules = {
-  exchangeType: [{ required: true, message: '请选择交换方式', trigger: 'change' }],
-  offerProductId: [{
-    required: true,
-    validator: (rule, value, callback) => {
-      if (form.exchangeType === 'item' && !value) callback(new Error('请选择提供的物品'))
-      else callback()
+  exchangeType: [
+    { required: true, message: "请选择交换方式", trigger: "change" },
+  ],
+  offerProductId: [
+    {
+      required: true,
+      validator: (rule, value, callback) => {
+        if (form.exchangeType === "item" && !value)
+          callback(new Error("请选择提供的物品"));
+        else callback();
+      },
+      trigger: "change",
     },
-    trigger: 'change'
-  }],
-  offerPoints: [{
-    required: true,
-    validator: (rule, value, callback) => {
-      if (form.exchangeType === 'points' && !value) callback(new Error('请输入使用的积分'))
-      else callback()
+  ],
+  offerPoints: [
+    {
+      required: true,
+      validator: (rule, value, callback) => {
+        if (form.exchangeType === "points") {
+          if (!value) return callback(new Error("请输入使用的积分"));
+          if (currentPoints.value === 0)
+            return callback(new Error("积分不足，无法使用积分置换"));
+        }
+        callback();
+      },
+      trigger: "blur",
     },
-    trigger: 'blur'
-  }],
-  initiatorValue: [{ required: true, message: '请填写期望估值', trigger: 'blur' }]
-}
+  ],
+  initiatorValue: [
+    { required: true, message: "请填写期望估值", trigger: "blur" },
+  ],
+};
 
 // 监听弹窗打开，加载我的物品列表
 watch(visible, (val) => {
-  if (val) loadMyProducts()
-})
+  if (val) loadMyProducts();
+});
 
 // 切换交换方式时清空对应字段
-watch(() => form.exchangeType, () => {
-  form.offerProductId = undefined
-  form.offerPoints = undefined
-  formRef.value?.clearValidate()
-})
+watch(
+  () => form.exchangeType,
+  () => {
+    form.offerProductId = undefined;
+    form.offerPoints = undefined;
+    formRef.value?.clearValidate();
+  },
+);
 
 function loadMyProducts() {
-  offerLoading.value = true
+  offerLoading.value = true;
   listProductInfo({
     pageNum: 1,
     pageSize: 100,
-    createBy: userStore.name
-  }).then(res => {
-    myProducts.value = (res.rows || []).filter(
-      item => item.productId !== props.targetItem.productId
-    )
-  }).finally(() => { offerLoading.value = false })
+    createBy: userStore.name,
+  })
+    .then((res) => {
+      myProducts.value = (res.rows || []).filter(
+        (item) => item.productId !== props.targetItem.productId,
+      );
+    })
+    .finally(() => {
+      offerLoading.value = false;
+    });
 }
 
 function handleSubmit() {
-  formRef.value.validate(valid => {
-    if (!valid) return
-    submitLoading.value = true
+  formRef.value.validate((valid) => {
+    if (!valid) return;
+    submitLoading.value = true;
 
     const payload = {
       targetProductId: props.targetItem.productId,
       exchangeType: form.exchangeType,
-      offerProductId: form.exchangeType === 'item' ? form.offerProductId : undefined,
-      offerPoints: form.exchangeType === 'points' ? form.offerPoints : undefined,
+      offerProductId:
+        form.exchangeType === "item" ? form.offerProductId : undefined,
+      offerPoints:
+        form.exchangeType === "points" ? form.offerPoints : undefined,
       initiatorValue: form.initiatorValue,
-      remark: form.remark
-    }
+      remark: form.remark,
+    };
 
-    applyExchange(payload).then(() => {
-      proxy.$modal.msgSuccess('申请提交成功，等待对方确认')
-      emit('success')
-      handleClose()
-    }).finally(() => { submitLoading.value = false })
-  })
+    applyExchange(payload)
+      .then(() => {
+        proxy.$modal.msgSuccess("申请提交成功，等待对方确认");
+        emit("success");
+        handleClose();
+      })
+      .finally(() => {
+        submitLoading.value = false;
+      });
+  });
 }
 
 function handleClose() {
-  formRef.value?.resetFields()
-  form.exchangeType = 'item'
-  visible.value = false
+  formRef.value?.resetFields();
+  form.exchangeType = "item";
+  visible.value = false;
 }
 </script>
 
@@ -290,7 +338,9 @@ function handleClose() {
   margin-top: 6px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  b { color: var(--el-color-primary); }
+  b {
+    color: var(--el-color-primary);
+  }
 }
 
 .hint-text {
