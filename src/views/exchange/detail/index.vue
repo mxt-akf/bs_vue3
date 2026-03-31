@@ -508,6 +508,7 @@ function handleFulfill() {
     }).then(() => {
         proxy.$modal.msgSuccess('交换完成！')
         getDetail()
+        userStore.getInfo()
     }).finally(() => { actionLoading.value = false })
 }
 
